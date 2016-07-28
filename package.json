@@ -7,7 +7,8 @@
     "test": "standard && mocha"
   },
   "dependencies": {
-    "debug": "^2.2.0"
+    "debug": "^2.2.0",
+    "readable-stream": "^2.1.4"
   },
   "devDependencies": {
     "fs-temp": "^1.1.0",
@@ -16,6 +17,6 @@
   },
   "engineStrict": true,
   "engines": {
-    "node": ">= 0.12"
+    "node": ">= 0.10"
   }
 }

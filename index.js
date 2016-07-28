@@ -1,7 +1,8 @@
 var fs = require('fs')
-var debug = require('debug')('fs-duplex-stream')
 var assert = require('assert')
-var Duplex = require('stream').Duplex
+
+var debug = require('debug')('fs-duplex-stream')
+var Duplex = require('readable-stream').Duplex
 
 function onOpen (err, fd) {
   if (err) return this.emit('error', err)
