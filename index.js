@@ -3,26 +3,39 @@ var assert = require('assert')
 
 var debug = require('debug')('fs-duplex-stream')
 var Duplex = require('readable-stream').Duplex
+var makeSymbol = require('make-symbol')
+
+var AllIsRead = makeSymbol('allIsRead')
+var BytesRead = makeSymbol('bytesRead')
+var BytesWritten = makeSymbol('bytesWritten')
+var FinishCalled = makeSymbol('finishCalled')
+var ReadEncoding = makeSymbol('readEncoding')
+var ReadTarget = makeSymbol('readTarget')
+var WriteQueue = makeSymbol('writeQueue')
+var WriteTarget = makeSymbol('writeTarget')
 
 function onOpen (err, fd) {
   if (err) return this.emit('error', err)
 
   debug('file opened with descriptor id %d', fd)
 
-  this.fd = fd
+  Object.defineProperty(this, 'fd', {
+    value: fd,
+    enumerable: true
+  })
 
-  if (this._readTarget > this.bytesRead) {
+  if (this[ReadTarget] > this[BytesRead]) {
     debug('read enqueued, executing')
 
-    var size = this._readTarget - this.bytesRead
+    var size = this[ReadTarget] - this[BytesRead]
     read.call(this, size)
   }
 
-  if (this._writeQueue !== null && this.bytesRead >= this._writeTarget) {
+  if (this[WriteQueue] !== null && this[BytesRead] >= this[WriteTarget]) {
     debug('write enqueued, executing')
 
-    var opts = this._writeQueue
-    this._writeQueue = null
+    var opts = this[WriteQueue]
+    this[WriteQueue] = null
     write.call(this, opts.chunk, opts.encoding, opts.cb)
   }
 }
@@ -44,8 +57,8 @@ function onTruncate (err) {
 function onFinish () {
   assert(this.fd)
 
-  debug('truncating file at %d bytes', this.bytesWritten)
-  fs.ftruncate(this.fd, this.bytesWritten, onTruncate.bind(this))
+  debug('truncating file at %d bytes', this[BytesWritten])
+  fs.ftruncate(this.fd, this[BytesWritten], onTruncate.bind(this))
 }
 
 function onReadResult (err, bytesRead, buffer) {
@@ -53,14 +66,14 @@ function onReadResult (err, bytesRead, buffer) {
 
   debug('read %d bytes', bytesRead)
 
-  this.bytesRead += bytesRead
+  this[BytesRead] += bytesRead
 
   var chunk = (bytesRead < buffer.length) ? buffer.slice(0, bytesRead) : buffer
 
-  if (this._readEncoding) {
+  if (this[ReadEncoding]) {
     try {
-      debug('decoding buffer as "%s"', this._readEncoding)
-      chunk = chunk.toString(this._readEncoding)
+      debug('decoding buffer as "%s"', this[ReadEncoding])
+      chunk = chunk.toString(this[ReadEncoding])
     } catch (err) {
       return this.emit('error', err)
     }
@@ -68,7 +81,7 @@ function onReadResult (err, bytesRead, buffer) {
 
   if (bytesRead < buffer.length) {
     // Must be done before the call to .push since that will trigger another read
-    this._allIsRead = true
+    this[AllIsRead] = true
 
     debug('last slice read')
     this.push(chunk)
@@ -80,16 +93,16 @@ function onReadResult (err, bytesRead, buffer) {
     this.push(chunk)
   }
 
-  if (this._writeQueue !== null) {
-    if (this.bytesRead >= this._writeTarget) {
+  if (this[WriteQueue] !== null) {
+    if (this[BytesRead] >= this[WriteTarget]) {
       debug('write enqueued, executing')
 
-      var opts = this._writeQueue
-      this._writeQueue = null
+      var opts = this[WriteQueue]
+      this[WriteQueue] = null
       write.call(this, opts.chunk, opts.encoding, opts.cb)
     } else {
-      if (this.bytesRead === this._readTarget) {
-        this._read(this._writeTarget - this.bytesRead)
+      if (this[BytesRead] === this[ReadTarget]) {
+        this._read(this[WriteTarget] - this[BytesRead])
       }
     }
   }
@@ -98,8 +111,8 @@ function onReadResult (err, bytesRead, buffer) {
 function read (size) {
   var result = new Buffer(size)
 
-  debug('queuing read of %d bytes at %d', size, this.bytesRead)
-  fs.read(this.fd, result, 0, size, this.bytesRead, onReadResult.bind(this))
+  debug('queuing read of %d bytes at %d', size, this[BytesRead])
+  fs.read(this.fd, result, 0, size, this[BytesRead], onReadResult.bind(this))
 }
 
 function write (chunk, encoding, cb) {
@@ -111,13 +124,13 @@ function write (chunk, encoding, cb) {
     assert(bytesWritten === chunk.length)
 
     debug('wrote %d bytes', bytesWritten)
-    this.bytesWritten += bytesWritten
+    this[BytesWritten] += bytesWritten
 
     cb(null)
   }
 
-  debug('queuing write of %d bytes at %d', chunk.length, this.bytesWritten)
-  fs.write(this.fd, chunk, 0, chunk.length, this.bytesWritten, onWriteResult.bind(this))
+  debug('queuing write of %d bytes at %d', chunk.length, this[BytesWritten])
+  fs.write(this.fd, chunk, 0, chunk.length, this[BytesWritten], onWriteResult.bind(this))
 }
 
 function FSDuplexStream (path, opts) {
@@ -135,53 +148,62 @@ function FSDuplexStream (path, opts) {
     this.setDefaultEncoding(opts.writeEncoding)
   }
 
-  this.path = path
-  this.bytesRead = 0
-  this.bytesWritten = 0
+  Object.defineProperty(this, 'path', {
+    value: path,
+    enumerable: true
+  })
 
-  this._readEncoding = (opts.readEncoding || null)
-
-  this._writeQueue = null
-  this._allIsRead = false
-  this._readTarget = 0
-  this._writeTarget = 0
+  this[AllIsRead] = false
+  this[BytesRead] = 0
+  this[BytesWritten] = 0
+  this[FinishCalled] = false
+  this[ReadEncoding] = (opts.readEncoding || null)
+  this[ReadTarget] = 0
+  this[WriteQueue] = null
+  this[WriteTarget] = 0
 
   fs.open(path, 'r+', onOpen.bind(this))
-
-  var origEmit = this.emit
-  this.emit = function (ev) {
-    if (ev === 'finish') {
-      debug('intercepting finish event')
-
-      this.emit = origEmit
-      onFinish.call(this)
-
-      return
-    }
-
-    origEmit.apply(this, arguments)
-  }
 }
 
 FSDuplexStream.prototype = Object.create(Duplex.prototype, {
   constructor: { value: FSDuplexStream, writable: true, configurable: true }
 })
 
+Object.defineProperty(FSDuplexStream.prototype, 'bytesRead', {
+  get: function () { return this[BytesRead] },
+  enumerable: true
+})
+
+Object.defineProperty(FSDuplexStream.prototype, 'bytesWritten', {
+  get: function () { return this[BytesWritten] },
+  enumerable: true
+})
+
+FSDuplexStream.prototype.emit = function (type) {
+  if (type === 'finish' && this[FinishCalled] === false) {
+    debug('intercepting finish event')
+    this[FinishCalled] = true
+    onFinish.call(this)
+  } else {
+    Duplex.prototype.emit.apply(this, arguments)
+  }
+}
+
 FSDuplexStream.prototype._read = function (size) {
   debug('read of %d bytes requested', size)
 
-  if (this._allIsRead) {
+  if (this[AllIsRead]) {
     debug('all is read, dropping request')
     return
   }
 
-  if (this._readTarget > this.bytesRead) {
+  if (this[ReadTarget] > this[BytesRead]) {
     debug('read already scheduled, dropping request')
     return
   }
 
   debug('advancing read target by %d bytes', size)
-  this._readTarget += size
+  this[ReadTarget] += size
 
   if (this.fd) read.call(this, size)
 }
@@ -190,25 +212,25 @@ FSDuplexStream.prototype._write = function (chunk, encoding, cb) {
   debug('write of %d bytes requested', chunk.length)
 
   debug('advancing write target by %d bytes', chunk.length)
-  this._writeTarget += chunk.length
+  this[WriteTarget] += chunk.length
 
   if (!this.fd) {
     debug('file not yet open, adding request to queue')
-    this._writeQueue = { chunk: chunk, encoding: encoding, cb: cb }
+    this[WriteQueue] = { chunk: chunk, encoding: encoding, cb: cb }
 
-    if (this.bytesRead < this._writeTarget && this.bytesRead === this._readTarget) {
-      this._read(this._writeTarget - this.bytesRead)
+    if (this[BytesRead] < this[WriteTarget] && this[BytesRead] === this[ReadTarget]) {
+      this._read(this[WriteTarget] - this[BytesRead])
     }
 
     return
   }
 
-  if (this.bytesRead < this._writeTarget) {
+  if (this[BytesRead] < this[WriteTarget]) {
     debug('chunk not yet read, adding request to queue')
-    this._writeQueue = { chunk: chunk, encoding: encoding, cb: cb }
+    this[WriteQueue] = { chunk: chunk, encoding: encoding, cb: cb }
 
-    if (this.bytesRead === this._readTarget) {
-      this._read(this._writeTarget - this.bytesRead)
+    if (this[BytesRead] === this[ReadTarget]) {
+      this._read(this[WriteTarget] - this[BytesRead])
     }
 
     return
