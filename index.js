@@ -191,7 +191,7 @@ FSDuplexStream.prototype._write = function (chunk, encoding, cb) {
 
   if (!this.fd) {
     debug('file not yet open, adding request to queue')
-    this._writeQueue = { chunk, encoding, cb }
+    this._writeQueue = { chunk: chunk, encoding: encoding, cb: cb }
 
     if (this.bytesRead < this._writeTarget && this.bytesRead === this._readTarget) {
       this._read(this._writeTarget - this.bytesRead)
@@ -202,7 +202,7 @@ FSDuplexStream.prototype._write = function (chunk, encoding, cb) {
 
   if (this.bytesRead < this._writeTarget) {
     debug('chunk not yet read, adding request to queue')
-    this._writeQueue = { chunk, encoding, cb }
+    this._writeQueue = { chunk: chunk, encoding: encoding, cb: cb }
 
     if (this.bytesRead === this._readTarget) {
       this._read(this._writeTarget - this.bytesRead)
