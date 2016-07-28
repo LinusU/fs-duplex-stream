@@ -1,0 +1,22 @@
+{
+  "name": "fs-duplex-stream",
+  "version": "0.0.0",
+  "license": "MIT",
+  "repository": "LinusU/fs-duplex-stream",
+  "scripts": {
+    "test": "standard && mocha"
+  },
+  "dependencies": {
+    "debug": "^2.2.0"
+  },
+  "devDependencies": {
+    "concat-stream": "^1.5.1",
+    "fs-temp": "^1.1.0",
+    "mocha": "^2.5.3",
+    "standard": "^7.1.2"
+  },
+  "engineStrict": true,
+  "engines": {
+    "node": ">= 0.12"
+  }
+}
