@@ -163,7 +163,9 @@ function FSDuplexStream (path, opts) {
   }
 }
 
-FSDuplexStream.prototype = Object.create(Duplex.prototype)
+FSDuplexStream.prototype = Object.create(Duplex.prototype, {
+  constructor: { value: FSDuplexStream, writable: true, configurable: true }
+})
 
 FSDuplexStream.prototype._read = function (size) {
   debug('read of %d bytes requested', size)
