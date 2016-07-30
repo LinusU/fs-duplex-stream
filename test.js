@@ -6,6 +6,8 @@ var assert = require('assert')
 
 var createDuplexStream = require('./')
 
+function noop () {}
+
 describe('FSDuplexStream', function () {
   it('pipes data through', function (done) {
     var path = temp.writeFileSync('aaaa', 'utf8')
@@ -57,6 +59,8 @@ describe('FSDuplexStream', function () {
     var file = createDuplexStream(path)
 
     file.end('bb')
+
+    file.on('data', noop)
 
     file.once('finish', function () {
       assert.equal(fs.readFileSync(path, 'utf8'), 'bb')
@@ -113,6 +117,8 @@ describe('FSDuplexStream', function () {
 
       file.end()
 
+      file.on('data', noop)
+
       file.on('finish', function () {
         var content = fs.readFileSync(target.path, 'utf8')
 
@@ -121,6 +127,38 @@ describe('FSDuplexStream', function () {
 
         done()
       })
+    })
+  })
+
+  it('exposes bytesWritten', function (done) {
+    var path = temp.writeFileSync('aaaa', 'utf8')
+    var file = createDuplexStream(path)
+
+    assert.ok('bytesWritten' in file)
+    assert.equal(file.bytesWritten, 0)
+
+    file.end('bb')
+
+    file.on('finish', function () {
+      assert.equal(file.bytesWritten, 2)
+
+      done()
+    })
+  })
+
+  it('exposes path', function (done) {
+    var path = temp.writeFileSync('aaaa', 'utf8')
+    var file = createDuplexStream(path)
+
+    assert.ok('path' in file)
+    assert.equal(file.path, path)
+
+    file.end('bb')
+
+    file.on('finish', function () {
+      assert.equal(file.path, path)
+
+      done()
     })
   })
 })
