@@ -4,29 +4,7 @@ var assert = require('assert')
 var debug = require('debug')('fs-duplex-stream')
 var writer = require('flush-write-stream')
 var duplexify = require('duplexify')
-
-function writev (chunks, cb) {
-  debug('write of %d chunks requested', chunks.length)
-
-  var i
-  var size = 0
-
-  for (i = 0; i < chunks.length; i++) {
-    size += chunks[i].chunk.length
-  }
-
-  var pos = 0
-  var buffer = new Buffer(size)
-
-  for (i = 0; i < chunks.length; i++) {
-    chunks[i].chunk.copy(buffer, pos)
-    pos += chunks[i].chunk.length
-  }
-
-  assert(pos === size)
-
-  return this._write(buffer, 'buffer', cb)
-}
+var writev = require('writev')
 
 function createWriter (write, flush, options) {
   var stream = writer(write, flush)
