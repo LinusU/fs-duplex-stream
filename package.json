@@ -8,8 +8,9 @@
   },
   "dependencies": {
     "debug": "^2.2.0",
-    "make-symbol": "^0.1.0",
-    "readable-stream": "^2.1.4"
+    "duplexify": "^3.4.5",
+    "flush-write-stream": "^1.0.0",
+    "writev": "^0.1.0"
   },
   "devDependencies": {
     "fs-temp": "^1.1.0",

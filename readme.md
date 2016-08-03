@@ -51,21 +51,6 @@ The `readEncoding` and `writeEncoding` can be any one of those accepted by
 
 `DuplexStream` is a [Duplex Stream][].
 
-#### Event: 'open'
-
-+ `fd` &lt;Integer&gt; Integer file descriptor used by the DuplexStream.
-
-Emitted when the DuplexStream's file is opened.
-
-#### Event: 'close'
-
-Emitted when the DuplexStream's underlying file descriptor has been closed using
-the `fs.close()` method.
-
-#### duplexStream.bytesRead
-
-The number of bytes read so far.
-
 #### duplexStream.bytesWritten
 
 The number of bytes written so far. Does not include data that is still queued
